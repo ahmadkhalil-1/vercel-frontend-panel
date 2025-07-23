@@ -119,18 +119,27 @@ const CategoryManagement = () => {
         return `${'http://localhost:5000'}/${cleanPath}`;
     };
 
+    // Helper to convert file to base64
+    const toBase64 = (file) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = error => reject(error);
+        });
+    };
+
     // --- Update handleSubcategorySubmit to only send name and image, no details ---
     const handleSubcategorySubmit = async (e) => {
         e.preventDefault();
         if (!selectedCategory) return;
-        const formDataToSend = new FormData();
-        formDataToSend.append('name', subcategoryFormData.name);
-        if (subcategoryFormData.image) {
-            formDataToSend.append('subcategoryImages', subcategoryFormData.image);
-        }
-        // No details field
+        const subcategoryImageBase64 = subcategoryFormData.image ? await toBase64(subcategoryFormData.image) : null;
+        const payload = {
+            name: subcategoryFormData.name,
+            subcategoryImageBase64
+        };
         try {
-            const response = await api.addSubcategory(selectedCategory._id, formDataToSend);
+            const response = await api.addSubcategory(selectedCategory._id, payload);
             // --- Subcategory Add/Edit/Delete: update local state instantly for manager ---
             // After successful add subcategory (manager):
             if (response.success) {
@@ -241,42 +250,29 @@ const CategoryManagement = () => {
             // Validate form data
             validateForm();
 
-            const formDataToSend = new FormData();
-            formDataToSend.append('name', formData.name.trim());
-            if (formData.categoryImage) {
-                formDataToSend.append('categoryImage', formData.categoryImage);
-            }
-
-            // Prepare subcategories structure for JSON
-            const subcategoriesData = formData.subcategories.map(sub => ({
-                name: sub.name.trim(),
-                details: sub.details.map(detail => ({
+            // Convert category image to base64
+            const categoryImageBase64 = formData.categoryImage ? await toBase64(formData.categoryImage) : null;
+            // Convert subcategory and detail images to base64
+            const subcategories = await Promise.all(formData.subcategories.map(async (sub) => {
+                const subcategoryImageBase64 = sub.image ? await toBase64(sub.image) : null;
+                const details = await Promise.all(sub.details.map(async (detail) => ({
                     price: parseFloat(detail.price),
-                    isLocked: detail.isLocked
-                }))
+                    isLocked: detail.isLocked,
+                    detailImageBase64: detail.image ? await toBase64(detail.image) : null
+                })));
+                return {
+                    name: sub.name.trim(),
+                    subcategoryImageBase64,
+                    details
+                };
             }));
+            const payload = {
+                name: formData.name.trim(),
+                categoryImageBase64,
+                subcategories: JSON.stringify(subcategories)
+            };
 
-            // Append subcategories as JSON string
-            formDataToSend.append('subcategories', JSON.stringify(subcategoriesData));
-
-            // Append subcategory images in order
-            formData.subcategories.forEach((sub, index) => {
-                if (sub.image) {
-                    formDataToSend.append('subcategoryImages', sub.image);
-                }
-            });
-
-
-            // Append detail images as flat array (backend expects this)
-            formData.subcategories.forEach((sub) => {
-                sub.details.forEach((detail) => {
-                    if (detail.image) {
-                        formDataToSend.append('detailImages', detail.image);
-                    }
-                });
-            });
-
-            const response = await api.addCategory(formDataToSend);
+            const response = await api.addCategory(payload);
             if (response.success) {
                 await fetchCategories();
                 setShowAddForm(false);
@@ -298,15 +294,12 @@ const CategoryManagement = () => {
         setLoading(true);
         setGlobalError("");
         try {
-            const formDataToSend = new FormData();
-            formDataToSend.append('name', selectedCategory.name.trim());
-            if (selectedCategory.newImage) {
-                formDataToSend.append('categoryImage', selectedCategory.newImage);
-            }
-
-            console.log('Updating category with image:', selectedCategory.newImage ? 'Yes' : 'No');
-
-            const response = await api.updateCategory(selectedCategory._id, formDataToSend);
+            const categoryImageBase64 = selectedCategory.newImage ? await toBase64(selectedCategory.newImage) : null;
+            const payload = {
+                name: selectedCategory.name.trim(),
+                ...(categoryImageBase64 && { categoryImageBase64 })
+            };
+            const response = await api.updateCategory(selectedCategory._id, payload);
             if (response.success) {
                 await fetchCategories();
                 setShowEditCategoryModal(false);
@@ -349,15 +342,12 @@ const CategoryManagement = () => {
         setLoading(true);
         setGlobalError("");
         try {
-            const formDataToSend = new FormData();
-            formDataToSend.append('name', selectedSubcategory.name.trim());
-            if (selectedSubcategory.newImage) {
-                formDataToSend.append('subcategoryImages', selectedSubcategory.newImage);
-            }
-
-            console.log('Updating subcategory with image:', selectedSubcategory.newImage ? 'Yes' : 'No');
-
-            const response = await api.updateSubcategory(selectedCategory._id, selectedSubcategory._id, formDataToSend);
+            const subcategoryImageBase64 = selectedSubcategory.newImage ? await toBase64(selectedSubcategory.newImage) : null;
+            const payload = {
+                name: selectedSubcategory.name.trim(),
+                ...(subcategoryImageBase64 && { subcategoryImageBase64 })
+            };
+            const response = await api.updateSubcategory(selectedCategory._id, selectedSubcategory._id, payload);
             // --- Subcategory Add/Edit/Delete: update local state instantly for manager ---
             // After successful edit subcategory (manager):
             if (response.success) {
@@ -442,39 +432,16 @@ const CategoryManagement = () => {
         setLoading(true);
         setGlobalError("");
         try {
-            const formDataToSend = new FormData();
-            formDataToSend.append('price', selectedDetail.price);
-            formDataToSend.append('isLocked', selectedDetail.isLocked);
-            if (selectedDetail.newImage) {
-                formDataToSend.append('detailImages', selectedDetail.newImage);
-            }
-
-            // Use categoryId and subcategoryId from selectedDetail instead of selectedCategory and selectedSubcategory
+            const detailImageBase64 = selectedDetail.newImage ? await toBase64(selectedDetail.newImage) : null;
+            const payload = {
+                price: selectedDetail.price,
+                isLocked: selectedDetail.isLocked,
+                ...(detailImageBase64 && { detailImageBase64 })
+            };
             const categoryId = selectedDetail.categoryId;
             const subcategoryId = selectedDetail.subcategoryId;
             const detailId = selectedDetail._id;
-
-            console.log('Detail update values:', {
-                categoryId,
-                subcategoryId,
-                detailId,
-                selectedDetailObj: selectedDetail
-            });
-
-            if (!categoryId || !subcategoryId || !detailId) {
-                throw new Error(`Missing required IDs for updating detail: categoryId=${categoryId}, subcategoryId=${subcategoryId}, detailId=${detailId}`);
-            }
-
-            console.log('Updating detail with image:', selectedDetail.newImage ? 'Yes' : 'No');
-            console.log('Detail update params:', { categoryId, subcategoryId, detailId });
-
-            const response = await api.updateDetail(
-                categoryId,
-                subcategoryId,
-                detailId,
-                formDataToSend
-            );
-
+            const response = await api.updateDetail(categoryId, subcategoryId, detailId, payload);
             if (response.success) {
                 setShowEditDetailModal(false);
                 setSelectedDetail(null);
@@ -1155,14 +1122,10 @@ const CategoryManagement = () => {
                                     <h2 className="text-xl font-semibold mb-4">Add Detail to {detailsModalSubcategory.name}</h2>
                                     <form onSubmit={async (e) => {
                                         e.preventDefault();
-                                        const formData = new FormData();
-                                        formData.append('price', detailFormData.price);
-                                        formData.append('isLocked', detailFormData.isLocked);
-                                        if (detailFormData.image) {
-                                            formData.append('detailImages', detailFormData.image);
-                                        }
+                                        const detailImageBase64 = detailFormData.image ? await toBase64(detailFormData.image) : null;
+                                        const payload = { price: detailFormData.price, isLocked: detailFormData.isLocked, detailImageBase64 };
                                         try {
-                                            const response = await api.addDetail(detailsModalCategory._id, detailsModalSubcategory._id, formData);
+                                            const response = await api.addDetail(detailsModalCategory._id, detailsModalSubcategory._id, payload);
                                             if (response.success) {
                                                 setShowAddDetailForm(false);
                                                 setDetailFormData({ price: '', isLocked: false, image: null });
@@ -1582,14 +1545,10 @@ const CategoryManagement = () => {
                         <h2 className="text-xl font-semibold mb-4">Add Detail to {selectedSubcategory.name}</h2>
                         <form onSubmit={async (e) => {
                             e.preventDefault();
-                            const formData = new FormData();
-                            formData.append('price', detailFormData.price);
-                            formData.append('isLocked', detailFormData.isLocked);
-                            if (detailFormData.image) {
-                                formData.append('detailImages', detailFormData.image);
-                            }
+                            const detailImageBase64 = detailFormData.image ? await toBase64(detailFormData.image) : null;
+                            const payload = { price: detailFormData.price, isLocked: detailFormData.isLocked, detailImageBase64 };
                             try {
-                                const response = await api.addDetail(selectedCategory._id, selectedSubcategory._id, formData);
+                                const response = await api.addDetail(selectedCategory._id, selectedSubcategory._id, payload);
                                 if (response.success) {
                                     await fetchCategories();
                                     setShowAddDetailForm(false);

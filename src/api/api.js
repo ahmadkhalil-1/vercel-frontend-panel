@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE_URL = 'https://vercel-backend-panel-cavh.vercel.app';
+const API_BASE_URL = 'http://localhost:5000';
 
 const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
@@ -54,31 +54,28 @@ const api = {
         return response.json();
     },
 
-    addSubcategory: async (categoryId, formData) => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/categories/${categoryId}/subcategories`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                },
-                body: formData
-            });
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Error adding subcategory:', error);
-            throw error;
-        }
+    addSubcategory: async (categoryId, data) => {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/api/categories/${categoryId}/subcategories`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        return response.json();
     },
 
-    addCategory: async (formData) => {
+    addCategory: async (data) => {
         const token = localStorage.getItem('token');
         const response = await fetch(`${API_BASE_URL}/api/categories/add`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
             },
-            body: formData
+            body: JSON.stringify(data)
         });
         return response.json();
     },
@@ -92,27 +89,29 @@ const api = {
     },
 
     // Update category
-    updateCategory: async (id, formData) => {
+    updateCategory: async (id, data) => {
         const token = localStorage.getItem('token');
         const response = await fetch(`${API_BASE_URL}/api/categories/${id}`, {
             method: 'PUT',
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
             },
-            body: formData
+            body: JSON.stringify(data)
         });
         return response.json();
     },
 
     // Update subcategory
-    updateSubcategory: async (categoryId, subcategoryId, formData) => {
+    updateSubcategory: async (categoryId, subcategoryId, data) => {
         const token = localStorage.getItem('token');
         const response = await fetch(`${API_BASE_URL}/api/categories/${categoryId}/subcategories/${subcategoryId}`, {
             method: 'PUT',
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
             },
-            body: formData
+            body: JSON.stringify(data)
         });
         return response.json();
     },
@@ -127,14 +126,15 @@ const api = {
     },
 
     // Update detail
-    updateDetail: async (categoryId, subcategoryId, detailId, formData) => {
+    updateDetail: async (categoryId, subcategoryId, detailId, data) => {
         const token = localStorage.getItem('token');
         const response = await fetch(`${API_BASE_URL}/api/categories/${categoryId}/subcategories/${subcategoryId}/details/${detailId}`, {
             method: 'PUT',
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
             },
-            body: formData
+            body: JSON.stringify(data)
         });
         return response.json();
     },
@@ -148,14 +148,15 @@ const api = {
         return response.json();
     },
 
-    addDetail: async (categoryId, subcategoryId, formData) => {
+    addDetail: async (categoryId, subcategoryId, data) => {
         const token = localStorage.getItem('token');
         const response = await fetch(`${API_BASE_URL}/api/categories/${categoryId}/subcategories/${subcategoryId}/details`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
             },
-            body: formData
+            body: JSON.stringify(data)
         });
         return response.json();
     },
